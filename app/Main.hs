@@ -2,10 +2,11 @@ module Main (main) where
 
 import Control.Monad (guard)
 import qualified Data.Set as S
-import qualified System.Random as R
-import Text.Read (readMaybe)
 import qualified GHC.IO.Handle as IO
 import System.IO
+import qualified System.Random as R
+import qualified Text.Printf as FMT
+import Text.Read (readMaybe)
 
 data Cell
   = Mine
@@ -142,16 +143,38 @@ printCell (State g flagged explored) pos@(x, y) showMines =
   if not showMines && S.member pos flagged
     then "F"
     else case cell of
-      Plain -> if S.member pos explored then " " else "#"
+      Plain -> if S.member pos explored then "." else "#"
       Mine -> if showMines then "*" else "#"
       Clue n -> if S.member pos explored then show n else "#"
   where
     cell = g !! x !! y
 
+formatHeadLevel :: Int -> Int -> String
+formatHeadLevel range strWidth =
+  "   " ++ concat [formatDigit i | i <- [0 .. range]]
+  where
+    formatDigit :: Int -> String
+    formatDigit num = FMT.printf ("%-" ++ show strWidth ++ "d") digit
+      where
+        digit = num `mod` 10
+        
+formatHead :: Int -> Int -> String
+formatHead range strWidth
+  | range == 0 = ""
+  | otherwise = formatHead (range `div` 10) (strWidth * 10) ++ "\n" ++ cur
+  where 
+    cur = formatHeadLevel range strWidth
+       
+
+printHead :: State -> IO ()
+printHead (State g _ _) =
+  putStrLn $ formatHead (length (head g) - 1) 2
+
 -- print the grid
 printGrid :: State -> IO ()
-printGrid state@(State g _ _) =
-  putStrLn $ unlines [concat [printCell state (x, y) False | y <- [0 .. (length (head g) - 1)]] | x <- [0 .. (length g - 1)]]
+printGrid state@(State g _ _) = do
+  printHead state
+  putStrLn $ unlines [FMT.printf "%-2d " x ++ unwords [printCell state (x, y) False | y <- [0 .. (length (head g) - 1)]] | x <- [0 .. (length g - 1)]]
 
 -- read from command and parse to an operation
 readInput :: Grid -> IO (Maybe Operation)
@@ -209,7 +232,7 @@ main :: IO ()
 main = do
   IO.hSetBuffering stdout IO.NoBuffering
   let height = 4
-  let width = 4
+  let width = 12
   let mineCnt = 1
   grid <- generateGrid height width mineCnt
   let state =
